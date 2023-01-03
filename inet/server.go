@@ -21,21 +21,21 @@ type Server struct {
 	Version string
 	//最大连接数
 	MaxConn int
-	//当前Server添加一个Router
-	Router iface.Router
+	//当前Server消息模块，绑定msgID处理对应API关系
+	MsgHandler iface.IMsgHandler
 }
 
 //初始化Server方法
 func NewServer() iface.Server {
 	conf := config.LoadServerConfig()
 	return &Server{
-		Name:      conf.Name,
-		IPVersion: conf.IPVersion,
-		IP:        conf.IP,
-		Port:      conf.Port,
-		Version:   conf.Version,
-		MaxConn:   conf.MaxConn,
-		Router:    nil,
+		Name:       conf.Name,
+		IPVersion:  conf.IPVersion,
+		IP:         conf.IP,
+		Port:       conf.Port,
+		Version:    conf.Version,
+		MaxConn:    conf.MaxConn,
+		MsgHandler: NewMsgHandler(),
 	}
 }
 
@@ -67,7 +67,7 @@ func (s *Server) Start() {
 				continue
 			}
 			//将处理业务的方法与连接绑定
-			dealConn := NewConnection(conn, cid, s.Router)
+			dealConn := NewConnection(conn, cid, s.MsgHandler)
 			cid++
 			go dealConn.Start()
 		}
@@ -92,8 +92,8 @@ func (s *Server) Serve() {
 }
 
 //路由功能：给当前服务注册一个路由业务方法，供客户端链接处理使用
-func (s *Server) AddRouter(router iface.Router) {
-	s.Router = router
+func (s *Server) AddRouter(msgID uint32, router iface.IRouter) {
+	s.MsgHandler.AddRouter(msgID, router)
 }
 
 //得到链接管理

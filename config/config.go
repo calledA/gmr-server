@@ -25,7 +25,7 @@ type Server struct {
 	//最大连接数
 	MaxConn int
 	//最大包字节
-	MaxPackageSize int
+	MaxPackageSize uint32
 }
 
 var config *Config
@@ -34,13 +34,13 @@ func LoadServerConfig() Server {
 	return *config.Server
 }
 
-func GetPackageSize() int {
+func GetPackageSize() uint32 {
 	return config.Server.MaxPackageSize
 }
 
 func (config *Config) LoadConfig() {
 	conf := viper.New()
-	conf.AddConfigPath("../../config") //设置读取的文件路径
+	conf.AddConfigPath("../../../../config") //设置读取的文件路径
 	conf.SetConfigName("app")          //设置读取的文件名
 	conf.SetConfigType("yml")          //设置文件的类型
 	//尝试进行配置读取
@@ -55,7 +55,7 @@ func (config *Config) LoadConfig() {
 	config.Server.Name = conf.GetString("server.name")
 	config.Server.Version = conf.GetString("server.version")
 	config.Server.MaxConn = conf.GetInt("server.max_conn")
-	config.Server.MaxPackageSize = conf.GetInt("server.max_package_size")
+	config.Server.MaxPackageSize = conf.GetUint32("server.max_package_size")
 }
 
 func init() {

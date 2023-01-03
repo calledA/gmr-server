@@ -6,7 +6,7 @@ import (
 )
 
 //连接接口
-type Connection interface {
+type IConnection interface {
 	//启动连接
 	Start()
 	//停止连接，结束连接状态

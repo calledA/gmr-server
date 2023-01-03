@@ -3,6 +3,6 @@ server:
   port: 8089
   ip_version: "tcp4"
   name: "GMR-SERVER"
-  version: "v0.4"
+  version: "v0.3"
   max_conn: 100
   max_package_size: 4096

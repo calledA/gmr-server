@@ -2,9 +2,10 @@ package inet
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"gmr/gmr-server/config"
 	"gmr/gmr-server/iface"
+	"io"
 	"net"
 )
 
@@ -20,18 +21,18 @@ type Connection struct {
 	MaxPackageSize int
 	//当前连接是否退出的channel
 	ExitChan chan bool
-	//该连接处理的方法Router
-	Router iface.Router
+	//绑定msgID处理对应API关系
+	MsgHandler iface.IMsgHandler
 }
 
 //初始化
-func NewConnection(conn *net.TCPConn, connID uint32, router iface.Router) iface.Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, msgHandler iface.IMsgHandler) iface.IConnection {
 	return &Connection{
-		Conn:           conn,
-		ConnID:         connID,
-		Router:         router,
-		isClosed:       false,
-		ExitChan:       make(chan bool, 1),
+		Conn:       conn,
+		ConnID:     connID,
+		MsgHandler: msgHandler,
+		isClosed:   false,
+		ExitChan:   make(chan bool, 1),
 	}
 }
 
@@ -48,24 +49,45 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 	for {
 		//读取客户端数据到buf，最大512
-		buf := make([]byte, config.GetPackageSize())
-		_, err := c.Conn.Read(buf)
-		if err != nil {
-			fmt.Println("recv buf err", err)
-			continue
+		// buf := make([]byte, config.GetPackageSize())
+		// _, err := c.Conn.Read(buf)
+		// if err != nil {
+		// 	fmt.Println("recv buf err", err)
+		// 	continue
+		// }
+
+		//创建拆包解包对象
+		dp := NewDataPack()
+		//读取客户端的msg header
+		headData := make([]byte, dp.GetHeadLen())
+		if _, err := io.ReadFull(c.GetTCPConnection(), headData); err != nil {
+			fmt.Println("read msg head error", err)
+			break
 		}
+		//拆包，得到msgID和msgDataLen放在消息中
+		msg, err := dp.Unpack(headData)
+		if err != nil {
+			fmt.Println("unpack error", err)
+			break
+		}
+		//根据dataLen，再次读取data放入msg.Data中
+		var data []byte
+		if msg.GetMsgLen() > 0 {
+			data = make([]byte, msg.GetMsgLen())
+			if _, err := io.ReadFull(c.GetTCPConnection(), data); err != nil {
+				fmt.Println("read msg error", err)
+				break
+			}
+		}
+		msg.SetData(data)
+
 		//得到当前conn数据的request的请求数据
 		req := Request{
 			conn: c,
-			data: buf,
+			msg:  msg,
 		}
-		//执行注册路由的方法
-		go func(request iface.Request) {
-			//从路由中找到绑定的Conn对应的router调用
-			c.Router.PreHandler(request)
-			c.Router.Handle(request)
-			c.Router.PostHandle(request)
-		}(&req)
+
+		go c.MsgHandler.DoMsgHandler(&req)
 	}
 }
 
@@ -103,6 +125,20 @@ func (c *Connection) RemoteAddr() net.Addr {
 
 //将Message数据发送给远程TCP客户端(无缓冲)
 func (c *Connection) SendMsg(msgID uint32, data []byte) error {
+	if c.isClosed {
+		return errors.New("connection closed when send msg")
+	}
+	dp := NewDataPack()
+	msg, err := dp.Pack(NewMsgPackage(msgID, data))
+	if err != nil {
+		fmt.Println("pack msg err,msgID = ", msgID)
+		return errors.New("pack msg err")
+	}
+	//将数据发送给客户端
+	if _, err := c.Conn.Write(msg); err != nil {
+		fmt.Println("wirte msg err,msgID = ", msgID)
+		return errors.New("conn write err")
+	}
 	return nil
 }
 

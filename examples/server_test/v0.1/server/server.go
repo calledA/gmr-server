@@ -11,7 +11,7 @@ type PingRouter struct {
 }
 
 //处理conn业务前的钩子方法
-func (br *PingRouter) PreHandler(request iface.Request) {
+func (br *PingRouter) PreHandler(request iface.IRequest) {
 	fmt.Println("call router prehandler")
 	_,err := request.GetConnection().GetTCPConnection().Write([]byte("prehandler ping"))
 	if err != nil {
@@ -20,7 +20,7 @@ func (br *PingRouter) PreHandler(request iface.Request) {
 }
 
 //处理conn业务中的钩子方法
-func (br *PingRouter) Handle(request iface.Request) {
+func (br *PingRouter) Handle(request iface.IRequest) {
 	fmt.Println("call router handler")
 	_,err := request.GetConnection().GetTCPConnection().Write([]byte("handler ping"))
 	if err != nil {
@@ -29,7 +29,7 @@ func (br *PingRouter) Handle(request iface.Request) {
 }
 
 //处理conn业务后的钩子方法
-func (br *PingRouter) PostHandle(request iface.Request) {
+func (br *PingRouter) PostHandle(request iface.IRequest) {
 	fmt.Println("call router posthandler")
 	_,err := request.GetConnection().GetTCPConnection().Write([]byte("posthandler ping"))
 	if err != nil {
@@ -40,6 +40,6 @@ func (br *PingRouter) PostHandle(request iface.Request) {
 func main() {
 	s := inet.NewServer()
 	//添加自定义router
-	s.AddRouter(&PingRouter{})
+	// s.AddRouter(&PingRouter{})
 	s.Serve()
 }
