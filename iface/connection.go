@@ -21,8 +21,6 @@ type IConnection interface {
 	RemoteAddr() net.Addr
 	//将Message数据发送给远程TCP客户端(无缓冲)
 	SendMsg(msgID uint32, data []byte) error
-	//将Message数据发送给远程TCP客户端(有缓冲)
-	SendBuffMsg(msgID uint32, data []byte) error
 }
 
 type HandleFunc func(*net.TCPConn,[]byte,int) error

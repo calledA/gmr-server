@@ -140,6 +140,3 @@ func (s *Server) CallOnConnStop(conn iface.IConnection) {
 	}
 }
 
-// func (s *Server) Packet() iface.DataPack         {
-// 	return iface.DataPack{}
-// }

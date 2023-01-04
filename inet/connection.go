@@ -182,10 +182,4 @@ func (c *Connection) SendMsg(msgID uint32, data []byte) error {
 	return nil
 }
 
-//将Message数据发送给远程TCP客户端(有缓冲)
-func (c *Connection) SendBuffMsg(msgID uint32, data []byte) error {
-
-	return nil
-
-}
 

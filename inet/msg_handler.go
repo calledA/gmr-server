@@ -66,7 +66,6 @@ func (mh *MsgHandler) SendMsgToTaskQueue(request iface.IRequest) {
 }
 
 func (mh *MsgHandler) SendOneTask(workID int, taskQueue chan iface.IRequest) {
-	fmt.Println("workID:", workID)
 	//不断阻塞等待对应消息队列的消息
 	for {
 		select {
