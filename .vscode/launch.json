@@ -9,7 +9,7 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "D:/Project/Golang/src/gmr/gmr-im/main.go"
+      "program": "D:/Project/Golang/src/gmr/gmr-im/examples/server_test/v0.3/server/server.go"
     }
   ]
 }

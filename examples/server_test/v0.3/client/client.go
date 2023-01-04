@@ -12,22 +12,22 @@ func main() {
 	fmt.Println("client start")
 	time.Sleep(time.Second)
 	//连接服务器得到conn连接
-	conn,err := net.Dial("tcp","127.0.0.1:8089")
+	conn, err := net.Dial("tcp", "127.0.0.1:8089")
 	if err != nil {
-		fmt.Println("client start error",err)
+		fmt.Println("client start error", err)
 		return
 	}
 	//连接调用write，写数据
-	for{
+	for {
 		//发送封包消息
 		dp := inet.NewDataPack()
-		binaryMsg ,err := dp.Pack(inet.NewMsgPackage(1,[]byte("gmr-server v0.2 client")))
+		binaryMsg, err := dp.Pack(inet.NewMsgPackage(1, []byte("gmr-server v0.3 client")))
 		if err != nil {
-			fmt.Println("pack err",err)
+			fmt.Println("pack err", err)
 			return
 		}
-		if _,err := conn.Write(binaryMsg);err != nil {
-			fmt.Println("write err",err)
+		if _, err := conn.Write(binaryMsg); err != nil {
+			fmt.Println("write err", err)
 			return
 		}
 

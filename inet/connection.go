@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gmr/gmr-server/config"
 	"gmr/gmr-server/iface"
 	"io"
 	"net"
@@ -11,29 +12,39 @@ import (
 
 //连接模块
 type Connection struct {
+	//属于哪个server
+	TCPServer iface.IServer
 	//TCP套接字
 	Conn *net.TCPConn
 	//连接ID
 	ConnID uint32
 	//当前连接状态
 	isClosed bool
+	//最大连接数
+	MaxConn int
 	//最大包字节数
 	MaxPackageSize int
-	//当前连接是否退出的channel
+	//当前连接是否退出的channel,由reader告知writer退出
 	ExitChan chan bool
+	//无缓冲管道，用于读写的通道消息通信
+	msgChan chan []byte
 	//绑定msgID处理对应API关系
 	MsgHandler iface.IMsgHandler
 }
 
 //初始化
-func NewConnection(conn *net.TCPConn, connID uint32, msgHandler iface.IMsgHandler) iface.IConnection {
-	return &Connection{
+func NewConnection(server iface.IServer, conn *net.TCPConn, connID uint32, msgHandler iface.IMsgHandler) iface.IConnection {
+	c := &Connection{
+		TCPServer:  server,
 		Conn:       conn,
 		ConnID:     connID,
 		MsgHandler: msgHandler,
 		isClosed:   false,
+		msgChan:    make(chan []byte),
 		ExitChan:   make(chan bool, 1),
 	}
+	c.TCPServer.GetConnMgr().Add(c)
+	return c
 }
 
 //启动连接
@@ -41,21 +52,19 @@ func (c *Connection) Start() {
 	fmt.Println("conn start connID:", c.ConnID)
 	//启动当前连接读数据的业务
 	go c.StartReader()
-	//TODO 启动当前连接写数据的业务
+	//启动当前连接写数据的业务
+	go c.StartWriter()
+
+	//使用自定义的hook函数
+	c.TCPServer.CallOnConnStart(c)
 }
 
+//读消息goroutine，专门接收客户端消息
 func (c *Connection) StartReader() {
-	fmt.Println("start reader is running")
+	defer fmt.Println("[reader is stop]")
+	fmt.Println("[start reader is running]")
 	defer c.Stop()
 	for {
-		//读取客户端数据到buf，最大512
-		// buf := make([]byte, config.GetPackageSize())
-		// _, err := c.Conn.Read(buf)
-		// if err != nil {
-		// 	fmt.Println("recv buf err", err)
-		// 	continue
-		// }
-
 		//创建拆包解包对象
 		dp := NewDataPack()
 		//读取客户端的msg header
@@ -87,7 +96,33 @@ func (c *Connection) StartReader() {
 			msg:  msg,
 		}
 
-		go c.MsgHandler.DoMsgHandler(&req)
+		if config.GetWorkerPoolSize() > 0 {
+			//已经开启工作池，通过工作池处理业务
+			c.MsgHandler.SendMsgToTaskQueue(&req)
+		} else {
+			//没有开启工作池，每个连接通过一个goroutine处理业务
+			go c.MsgHandler.DoMsgHandler(&req)
+		}
+	}
+}
+
+//写消息goroutine，专门向客户端发送消息
+func (c *Connection) StartWriter() {
+	defer fmt.Println("[writer is stop]")
+	fmt.Println("[writer is running]")
+	//不断阻塞等待channel消息，进行写消息
+	for {
+		select {
+		case data := <-c.msgChan:
+			//如果有数据写给客户端
+			if _, err := c.Conn.Write(data); err != nil {
+				fmt.Println("send data error", err)
+				return
+			}
+		case <-c.ExitChan:
+			//代表reader退出，此时writer也要退出
+			return
+		}
 	}
 }
 
@@ -98,9 +133,17 @@ func (c *Connection) Stop() {
 		return
 	}
 	c.isClosed = true
+	//调用自定义的hook
+	c.TCPServer.CallOnConnStop(c)
+	//关闭socket连接
 	c.Conn.Close()
+	//告知writer，关闭连接
+	c.ExitChan <- true
+	//将当前连接从connManager中摘除
+	c.TCPServer.GetConnMgr().Remove(c)
 	//回收资源
 	close(c.ExitChan)
+	close(c.msgChan)
 }
 
 //返回ctx，用于用户自定义go程获取连接退出状态
@@ -134,11 +177,8 @@ func (c *Connection) SendMsg(msgID uint32, data []byte) error {
 		fmt.Println("pack msg err,msgID = ", msgID)
 		return errors.New("pack msg err")
 	}
-	//将数据发送给客户端
-	if _, err := c.Conn.Write(msg); err != nil {
-		fmt.Println("wirte msg err,msgID = ", msgID)
-		return errors.New("conn write err")
-	}
+	//将数据发送给msgChan
+	c.msgChan <- msg
 	return nil
 }
 
@@ -149,13 +189,3 @@ func (c *Connection) SendBuffMsg(msgID uint32, data []byte) error {
 
 }
 
-//设置连接属性
-func (c *Connection) SetProperty(key string, value interface{}) {}
-
-//获取连接属性
-func (c *Connection) GetProperty(key string) (interface{}, error) {
-	return nil, nil
-}
-
-//移除连接属性
-func (c *Connection) RemoveProperty(key string) {}

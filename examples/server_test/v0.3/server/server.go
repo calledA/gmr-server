@@ -35,9 +35,26 @@ func (br *HelloRouter) Handle(request iface.IRequest) {
 		fmt.Println(err)
 	}
 }
+//创建链接之后执行钩子函数
+func DoConnectionBegin(conn iface.IConnection) {
+	fmt.Println("===> DoConnectionBegin is Called ... ")
+	if err := conn.SendMsg(202, []byte("DoConnection BEGIN")); err != nil {
+		fmt.Println(err)
+	}
+}
+
+//链接断开之前的需要执行的函数
+func DoConnectionLost(conn iface.IConnection) {
+	fmt.Println("===> DoConnectionLost is Called ...")
+	fmt.Println("conn ID = ", conn.GetConnID(), " is Lost...")
+}
 
 func main() {
 	s := inet.NewServer()
+
+	s.SetOnConnStart(DoConnectionBegin)
+	s.SetOnConnStop(DoConnectionLost)
+	
 	//添加自定义router
 	s.AddRouter(0,&PingRouter{})
 	s.AddRouter(1,&HelloRouter{})

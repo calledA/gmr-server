@@ -6,3 +6,5 @@ server:
   version: "v0.3"
   max_conn: 100
   max_package_size: 4096
+  worker_pool_size: 10
+  max_worker_task_len: 1024
